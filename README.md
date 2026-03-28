@@ -32,6 +32,43 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+### Run the app
+
+```bash
+streamlit run app.py
+```
+
+---
+
+## Testing PawPal+
+
+### Run the tests
+
+```bash
+python3 -m pytest tests/test_pawpal.py -v
+```
+
+### What the tests cover
+
+| Area | What is verified |
+|---|---|
+| **Task** | Priority level mapping, editing attributes, marking complete |
+| **Pet** | Updating info, adding tasks increases task count |
+| **Owner** | Updating name and available time |
+| **Scheduler — core** | High priority scheduled first, time budget respected, completed tasks skipped, start/end times assigned, total time accurate |
+| **Scheduler — sorting** | Tasks returned in chronological order, unscheduled tasks sort to the end |
+| **Scheduler — recurrence** | Daily task creates a new task due tomorrow, weekly due in 7 days, one-time task creates nothing |
+| **Scheduler — conflicts** | Overlapping windows produce a warning, back-to-back tasks do not |
+| **DailyPlan** | Empty plan message, summary string content |
+
+### Confidence level
+
+⭐⭐⭐⭐ (4/5)
+
+The core scheduling logic, sorting, filtering, recurrence, and conflict detection are all covered with 22 passing tests. One star is held back because edge cases like month/year rollovers for recurring tasks, schedules with zero tasks, and the Streamlit UI layer are not yet tested.
+
+---
+
 ### Suggested workflow
 
 1. Read the scenario carefully and identify requirements and edge cases.

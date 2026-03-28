@@ -1,4 +1,5 @@
 import pytest
+from datetime import time, date, timedelta
 from pawpal_system import Pet, Task, Owner, OwnerPreferences, Scheduler, DailyPlan
 
 
@@ -131,3 +132,106 @@ def test_add_task_increases_pet_task_count(pet):
     task = Task("Breakfast", "feeding", 10, "high", pet)
     pet.add_task(task)
     assert len(pet.tasks) == 1
+
+
+# --- Sorting tests ---
+
+def test_sort_by_time_returns_chronological_order(owner, pet):
+    """Sorting: tasks should come back in start_time order, earliest first."""
+    t1 = Task("Walk",      "walk",    20, "high",   pet)
+    t2 = Task("Grooming",  "grooming",15, "medium", pet)
+    t3 = Task("Breakfast", "feeding", 10, "high",   pet)
+
+    t1.start_time = time(9, 0)
+    t2.start_time = time(10, 30)
+    t3.start_time = time(8, 0)
+
+    scheduler = Scheduler(owner)
+    sorted_tasks = scheduler.sort_by_time([t1, t2, t3])
+
+    assert sorted_tasks[0].name == "Breakfast"   # 08:00 — earliest
+    assert sorted_tasks[1].name == "Walk"         # 09:00
+    assert sorted_tasks[2].name == "Grooming"     # 10:30 — latest
+
+def test_sort_by_time_puts_unscheduled_last(owner, pet):
+    """Sorting: tasks with no start_time should always appear after scheduled ones."""
+    scheduled = Task("Walk",   "walk",    20, "high", pet)
+    unscheduled = Task("Bath", "grooming", 15, "low", pet)
+
+    scheduled.start_time = time(8, 0)
+    # unscheduled.start_time stays None
+
+    scheduler = Scheduler(owner)
+    sorted_tasks = scheduler.sort_by_time([unscheduled, scheduled])
+
+    assert sorted_tasks[0].name == "Walk"   # has a time — goes first
+    assert sorted_tasks[1].name == "Bath"   # no time — goes last
+
+
+# --- Recurrence tests ---
+
+def test_daily_task_creates_next_occurrence(owner, pet):
+    """Recurrence: completing a daily task should add a new task due tomorrow."""
+    task = Task("Morning Walk", "walk", 30, "high", pet, frequency="daily")
+    owner.tasks.append(task)
+
+    scheduler = Scheduler(owner)
+    next_task = scheduler.complete_task(task)
+
+    assert task.is_completed is True
+    assert next_task is not None
+    assert next_task.due_date == date.today() + timedelta(days=1)
+    assert next_task.is_completed is False
+    assert len(owner.tasks) == 2   # original + new occurrence
+
+def test_weekly_task_creates_next_occurrence(owner, pet):
+    """Recurrence: completing a weekly task should add a new task due in 7 days."""
+    task = Task("Flea Meds", "meds", 10, "high", pet, frequency="weekly")
+    owner.tasks.append(task)
+
+    scheduler = Scheduler(owner)
+    next_task = scheduler.complete_task(task)
+
+    assert next_task.due_date == date.today() + timedelta(weeks=1)
+
+def test_once_task_creates_no_new_occurrence(owner, pet):
+    """Recurrence: completing a one-time task should not add any new task."""
+    task = Task("Vet Visit", "meds", 60, "high", pet, frequency="once")
+    owner.tasks.append(task)
+
+    scheduler = Scheduler(owner)
+    next_task = scheduler.complete_task(task)
+
+    assert next_task is None
+    assert len(owner.tasks) == 1   # no new task added
+
+
+# --- Conflict detection tests ---
+
+def test_detect_conflicts_flags_overlapping_tasks(owner, pet):
+    """Conflict Detection: two tasks with overlapping windows should produce a warning."""
+    luna = Pet("Luna", "cat", "Domestic Shorthair", 5)
+
+    t1 = Task("Bath Time",  "grooming", 20, "medium", pet)
+    t2 = Task("Flea Check", "meds",     15, "medium", luna)
+
+    t1.start_time = time(9, 0);  t1.end_time = time(9, 20)
+    t2.start_time = time(9, 10); t2.end_time = time(9, 25)  # overlaps t1
+
+    warnings = Scheduler(owner).detect_conflicts([t1, t2])
+
+    assert len(warnings) == 1
+    assert "Bath Time" in warnings[0]
+    assert "Flea Check" in warnings[0]
+
+def test_detect_conflicts_no_warning_for_back_to_back(owner, pet):
+    """Conflict Detection: tasks that touch but do not overlap should not conflict."""
+    t1 = Task("Walk",      "walk",    20, "high", pet)
+    t2 = Task("Breakfast", "feeding", 10, "high", pet)
+
+    t1.start_time = time(8, 0);  t1.end_time = time(8, 20)
+    t2.start_time = time(8, 20); t2.end_time = time(8, 30)  # starts exactly when t1 ends
+
+    warnings = Scheduler(owner).detect_conflicts([t1, t2])
+
+    assert len(warnings) == 0
