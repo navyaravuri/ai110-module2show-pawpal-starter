@@ -2,15 +2,80 @@
 
 ## 1. System Design
 
+### Core User Actions
+
+- Enter owner and pet info — input basic profile details about themselves and their pet to personalize the experience.
+
+- Add/edit care tasks — create and modify tasks (walks, feeding, meds, etc.) with at minimum a duration and priority level.
+
+- Generate a daily schedule/plan — trigger the scheduler to produce a prioritized daily plan based on their constraints, and see an explanation of why the plan was chosen that way.
+
+### Building Blocks
+
+| Component            | Type        | Name                  | Description                                                                 |
+|---------------------|------------|-----------------------|-----------------------------------------------------------------------------|
+| OwnerPreferences     | Attribute  | wake_time             | Hour to start scheduling (24h format, default = 7)                          |
+| OwnerPreferences     | Attribute  | sleep_time            | Hour to stop scheduling (24h format, default = 22)                          |
+| OwnerPreferences     | Attribute  | avoid_back_to_back    | Whether to avoid scheduling tasks consecutively                             |
+| Pet                  | Attribute  | name                  | Pet’s name                                                                  |
+| Pet                  | Attribute  | species               | Type of animal (e.g., dog, cat)                                             |
+| Pet                  | Attribute  | breed                 | Pet breed                                                                   |
+| Pet                  | Attribute  | age                   | Pet age                                                                     |
+| Pet                  | Method     | update_info()         | Updates pet attributes dynamically                                          |
+| Task                 | Attribute  | name                  | Task name                                                                   |
+| Task                 | Attribute  | category              | Task category (walk, feeding, etc.)                                         |
+| Task                 | Attribute  | duration              | Duration in minutes                                                         |
+| Task                 | Attribute  | priority              | Priority label ("low", "medium", "high")                                   |
+| Task                 | Attribute  | pet                   | The pet this task belongs to                                                |
+| Task                 | Attribute  | is_completed          | Whether the task is completed                                               |
+| Task                 | Attribute  | start_time            | Start time assigned by scheduler                                            |
+| Task                 | Attribute  | end_time              | End time assigned by scheduler                                              |
+| Task                 | Property   | priority_level        | Numeric priority derived from PRIORITY_MAP                                  |
+| Task                 | Method     | edit()                | Updates task attributes                                                     |
+| Task                 | Method     | mark_complete()       | Marks task as completed                                                     |
+| Owner                | Attribute  | name                  | Owner’s name                                                                |
+| Owner                | Attribute  | time_available        | Total available time in minutes                                             |
+| Owner                | Attribute  | preferences           | OwnerPreferences object                                                     |
+| Owner                | Attribute  | pets                  | List of pets owned                                                          |
+| Owner                | Attribute  | tasks                 | List of tasks                                                               |
+| Owner                | Method     | update_info()         | Updates owner attributes                                                    |
+| DailyPlan            | Attribute  | scheduled_tasks       | List of tasks included in the plan                                          |
+| DailyPlan            | Attribute  | skipped_tasks         | List of tasks not included                                                  |
+| DailyPlan            | Attribute  | total_time            | Total time of scheduled tasks                                               |
+| DailyPlan            | Method     | display()             | Returns formatted plan for UI                                               |
+| DailyPlan            | Method     | get_summary()         | Returns summary explanation of the plan                                     |
+| Scheduler            | Attribute  | owner                 | Owner object used for scheduling                                            |
+| Scheduler            | Method     | generate_plan()       | Creates a plan, assigns start/end times, returns DailyPlan                  |
+| Scheduler            | Method     | explain_plan(plan)    | Explains why tasks were scheduled or skipped                                |
+
 **a. Initial design**
 
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
+My initial UML design included five main classes: Pet, Task, Owner, DailyPlan, and Scheduler.
+
+- Pet was responsible for storing basic pet information (name, species, breed, age) and allowing updates to that data.
+- Task represented individual pet care activities, with attributes like duration, priority, and completion status, along with methods to edit or mark tasks as complete.
+- Owner acted as the central entity, holding the pet and a list of tasks, as well as constraints like available time and preferences.
+- DailyPlan was designed to store the results of scheduling, including which tasks were scheduled or skipped and the total time used, and to provide a formatted display and summary.
+- Scheduler handled the core logic, taking the owner’s tasks and constraints to generate a daily plan and explain the reasoning behind it.
+
+Overall, the design separated data (Pet, Task, Owner) from planning logic (Scheduler) and output representation (DailyPlan).
+
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+
+Yes, the design did change during implementation.
+
+One key change was updating the **Owner** class from holding a single pet to supporting **multiple pets** using a list. This was done to make the system more realistic and flexible, since many owners have more than one pet. It also allowed tasks to be better organized and associated with specific pets.
+
+Another change was adding **start_time and end_time attributes to Task**, so the scheduler could assign actual time slots instead of just ordering tasks. This made the daily plan more practical and easier to understand for users.
+
+These changes improved the system’s flexibility and made the scheduling output more meaningful.
+
 
 ---
 
