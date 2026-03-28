@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import time, timedelta, datetime
+from datetime import date, time, timedelta, datetime
 from typing import Optional
 
 
@@ -40,6 +40,8 @@ class Task:
     priority: str       # "low", "medium", or "high" — use priority_level for comparisons
     pet: Pet            # which pet this task belongs to
     is_completed: bool = False
+    frequency: str = "once"             # "once", "daily", or "weekly"
+    due_date: Optional[date] = None     # the date this task is due (defaults to today if not set)
     start_time: Optional[time] = None   # set by Scheduler after planning
     end_time: Optional[time] = None     # set by Scheduler after planning
 
@@ -55,9 +57,37 @@ class Task:
             if key in allowed:
                 setattr(self, key, value)
 
-    def mark_complete(self) -> None:
-        """Mark this task as completed."""
+    def mark_complete(self) -> Optional["Task"]:
+        """Mark this task as completed. For recurring tasks, return the next Task instance."""
         self.is_completed = True
+        today = date.today()
+        if self.frequency == "daily":
+            return Task(
+                name=self.name,
+                category=self.category,
+                duration=self.duration,
+                priority=self.priority,
+                pet=self.pet,
+                is_completed=False,
+                frequency=self.frequency,
+                due_date=today + timedelta(days=1),
+                start_time=None,
+                end_time=None,
+            )
+        elif self.frequency == "weekly":
+            return Task(
+                name=self.name,
+                category=self.category,
+                duration=self.duration,
+                priority=self.priority,
+                pet=self.pet,
+                is_completed=False,
+                frequency=self.frequency,
+                due_date=today + timedelta(weeks=1),
+                start_time=None,
+                end_time=None,
+            )
+        return None
 
 
 class Owner:
@@ -151,6 +181,19 @@ class Scheduler:
 
         return plan
 
+    def sort_by_time(self, tasks: list[Task]) -> list[Task]:
+        """Return tasks sorted by start_time; unscheduled tasks (no start_time) go to the end."""
+        return sorted(tasks, key=lambda t: (t.start_time is None, t.start_time))
+
+    def filter_tasks(self, tasks: list[Task], *, pet_name: str = None, completed: bool = None) -> list[Task]:
+        """Return tasks filtered by pet name, completion status, or both."""
+        result = tasks
+        if pet_name is not None:
+            result = [t for t in result if t.pet.name == pet_name]
+        if completed is not None:
+            result = [t for t in result if t.is_completed == completed]
+        return result
+
     def explain_plan(self, plan: DailyPlan) -> str:
         """Return a human-readable explanation of why tasks were included or skipped."""
         lines = ["### Plan Explanation\n"]
@@ -177,3 +220,23 @@ class Scheduler:
             f"{self.owner.time_available} min available."
         )
         return "\n".join(lines)
+
+    def detect_conflicts(self, tasks: list[Task]) -> list[str]:
+        """Return a list of warning messages for any tasks whose time windows overlap."""
+        warnings = []
+        scheduled = [t for t in tasks if t.start_time and t.end_time]
+        for i, a in enumerate(scheduled):
+            for b in scheduled[i + 1:]:
+                if a.start_time < b.end_time and b.start_time < a.end_time:
+                    warnings.append(
+                        f"⚠ Conflict: '{a.name}' ({a.pet.name}, {a.start_time.strftime('%I:%M %p')}–{a.end_time.strftime('%I:%M %p')}) "
+                        f"overlaps with '{b.name}' ({b.pet.name}, {b.start_time.strftime('%I:%M %p')}–{b.end_time.strftime('%I:%M %p')})"
+                    )
+        return warnings
+
+    def complete_task(self, task: Task) -> Optional[Task]:
+        """Mark a task complete and, for recurring tasks, append the next occurrence to the owner's task list."""
+        next_task = task.mark_complete()
+        if next_task is not None:
+            self.owner.tasks.append(next_task)
+        return next_task

@@ -86,10 +86,14 @@ These changes improved the system’s flexibility and made the scheduling output
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
 - How did you decide which constraints mattered most?
 
+The scheduler considers three main constraints: the owner's total available time, task priority (low/medium/high), and the owner's wake and sleep hours. Priority was the most important because a pet's medication or feeding should always come before optional tasks like grooming. Time availability came second, since the schedule has to fit within the owner's day. Wake and sleep hours set the boundaries so nothing gets scheduled at unrealistic times.
+
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+
+The scheduler uses a greedy approach — it picks tasks in priority order and adds each one if it fits, skipping it if not. This means a long low-priority task won't block a short high-priority one, but it also means the schedule isn't perfectly optimized. For example, two medium tasks might fit where one large high-priority task was skipped. This tradeoff is reasonable because pet care schedules don't need to be mathematically perfect — they just need to make sure the most important tasks get done first within the time available.
 
 ---
 
