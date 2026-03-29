@@ -22,6 +22,20 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Features
+
+- **Priority-based scheduling** — tasks are sorted by priority (high → medium → low) before time slots are assigned, ensuring the most critical care always gets scheduled first
+- **Time budget enforcement** — the scheduler tracks the owner's available minutes and skips any task that would exceed the remaining budget, never overloading the day
+- **Sorting by time** — scheduled tasks are displayed in chronological order using `sort_by_time()`, regardless of the order they were added
+- **Filtering by pet or status** — `filter_tasks()` lets you narrow the task list by pet name, completion status, or both at once
+- **Daily recurrence** — marking a daily task complete automatically creates a new instance due the following day using `timedelta(days=1)`
+- **Weekly recurrence** — marking a weekly task complete creates a new instance due 7 days later using `timedelta(weeks=1)`
+- **Conflict detection** — `detect_conflicts()` checks all scheduled tasks for overlapping time windows and returns a plain-language warning for each conflict found, without crashing the program
+- **Plan explanation** — `explain_plan()` produces a human-readable summary of why each task was scheduled or skipped
+- **Streamlit UI** — owners can add pets and tasks, filter the task list, generate a daily schedule, and see conflict warnings all in one interactive page
+
+---
+
 ## Getting started
 
 ### Setup

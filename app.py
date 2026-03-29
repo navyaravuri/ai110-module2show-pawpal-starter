@@ -47,8 +47,8 @@ if submitted:
 
 if owner.pets:
     st.markdown("**Your pets:**")
-    for pet in owner.pets:
-        st.write(f"- **{pet.name}** ({pet.species}, {pet.breed}, age {pet.age})")
+    pet_rows = [{"Name": p.name, "Species": p.species, "Breed": p.breed, "Age": p.age} for p in owner.pets]
+    st.table(pet_rows)
 else:
     st.info("No pets yet. Add one above.")
 
@@ -73,7 +73,12 @@ else:
         with col4:
             priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 
-        selected_pet_name = st.selectbox("For which pet?", pet_names)
+        col5, col6 = st.columns(2)
+        with col5:
+            selected_pet_name = st.selectbox("For which pet?", pet_names)
+        with col6:
+            frequency = st.selectbox("Frequency", ["once", "daily", "weekly"])
+
         task_submitted = st.form_submit_button("Add task")
 
     if task_submitted:
@@ -84,25 +89,47 @@ else:
             duration=int(duration),
             priority=priority,
             pet=target_pet,
+            frequency=frequency,
         )
         owner.tasks.append(new_task)
         target_pet.add_task(new_task)
-        st.success(f"Added task '{new_task.name}' for {target_pet.name}.")
+        st.success(f"Added '{new_task.name}' for {target_pet.name} ({frequency}).")
 
+    # ── Filter controls ───────────────────────────────────────────────────────
     if owner.tasks:
-        st.markdown("**Pending tasks:**")
-        task_rows = [
-            {
-                "Task": t.name,
-                "Pet": t.pet.name,
-                "Category": t.category,
-                "Duration (min)": t.duration,
-                "Priority": t.priority,
-                "Done": t.is_completed,
-            }
-            for t in owner.tasks
-        ]
-        st.table(task_rows)
+        st.markdown("**Filter tasks**")
+        col1, col2 = st.columns(2)
+        with col1:
+            filter_pet = st.selectbox("Filter by pet", ["All"] + [p.name for p in owner.pets])
+        with col2:
+            filter_status = st.selectbox("Filter by status", ["All", "Pending", "Completed"])
+
+        scheduler = Scheduler(owner)
+        filtered = owner.tasks
+
+        if filter_pet != "All":
+            filtered = scheduler.filter_tasks(filtered, pet_name=filter_pet)
+        if filter_status == "Pending":
+            filtered = scheduler.filter_tasks(filtered, completed=False)
+        elif filter_status == "Completed":
+            filtered = scheduler.filter_tasks(filtered, completed=True)
+
+        if filtered:
+            task_rows = [
+                {
+                    "Task": t.name,
+                    "Pet": t.pet.name,
+                    "Category": t.category,
+                    "Duration (min)": t.duration,
+                    "Priority": t.priority,
+                    "Frequency": t.frequency,
+                    "Status": "Done" if t.is_completed else "Pending",
+                }
+                for t in filtered
+            ]
+            st.table(task_rows)
+        else:
+            st.info("No tasks match the current filter.")
     else:
         st.info("No tasks yet. Add one above.")
 
@@ -117,6 +144,38 @@ if st.button("Build today's plan"):
     else:
         scheduler = Scheduler(owner)
         plan = scheduler.generate_plan()
-        st.markdown(plan.display())
-        st.divider()
-        st.markdown(scheduler.explain_plan(plan))
+
+        # ── Conflict warnings ─────────────────────────────────────────────────
+        conflicts = scheduler.detect_conflicts(plan.scheduled_tasks)
+        if conflicts:
+            for msg in conflicts:
+                st.warning(msg)
+        else:
+            st.success("No scheduling conflicts detected.")
+
+        # ── Sorted schedule table ─────────────────────────────────────────────
+        sorted_tasks = scheduler.sort_by_time(plan.scheduled_tasks)
+        if sorted_tasks:
+            st.markdown(f"**Scheduled — {plan.total_time} min of {owner.time_available} min used**")
+            schedule_rows = [
+                {
+                    "Time": f"{t.start_time.strftime('%I:%M %p')} – {t.end_time.strftime('%I:%M %p')}",
+                    "Task": t.name,
+                    "Pet": t.pet.name,
+                    "Duration (min)": t.duration,
+                    "Priority": t.priority,
+                    "Status": "Done" if t.is_completed else "Pending",
+                }
+                for t in sorted_tasks
+            ]
+            st.table(schedule_rows)
+
+        # ── Skipped tasks ─────────────────────────────────────────────────────
+        if plan.skipped_tasks:
+            st.markdown("**Skipped — not enough time remaining**")
+            for t in plan.skipped_tasks:
+                st.warning(f"{t.name} ({t.pet.name}, {t.duration} min, {t.priority} priority)")
+
+        # ── Plan explanation ──────────────────────────────────────────────────
+        with st.expander("Why was the plan built this way?"):
+            st.markdown(scheduler.explain_plan(plan))
